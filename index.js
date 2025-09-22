@@ -3,9 +3,7 @@ const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST } = require
 
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.Guilds
     ]
 });
 
