@@ -17,6 +17,12 @@ const commands = [
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
 
+    // Set bot status
+    client.user.setPresence({
+        activities: [{ name: 'WorldGuessr', type: 0 }], // 0 = Playing
+        status: 'online'
+    });
+
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
