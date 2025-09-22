@@ -3,7 +3,9 @@ const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST } = require
 
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ]
 });
 
@@ -22,6 +24,8 @@ client.once('ready', async () => {
         activities: [{ name: 'WorldGuessr', type: 0 }], // 0 = Playing
         status: 'online'
     });
+
+    console.log(`🟢 Bot status set to: ${client.user.presence.status}`);
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
@@ -48,6 +52,13 @@ client.on('interactionCreate', async (interaction) => {
             ephemeral: false
         });
     }
+});
+
+client.on('messageCreate', (message) => {
+    // Don't log bot messages
+    if (message.author.bot) return;
+
+    console.log(`📝 [${message.guild?.name || 'DM'}] ${message.author.tag}: ${message.content}`);
 });
 
 client.on('error', (error) => {
