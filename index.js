@@ -65,7 +65,7 @@ client.on('messageCreate', async (message) => {
 
     // Check if this is a quiz channel and handle quiz answers
     if (quizManager.isQuizChannel(message.channel.id)) {
-        const activeQuiz = quizManager.db.getActiveQuiz(message.channel.id);
+        const activeQuiz = quizManager.activeQuizzes.get(message.channel.id);
 
         if (activeQuiz && !message.content.startsWith('/') && !message.content.startsWith('!')) {
             // This is a potential quiz answer

@@ -8,6 +8,8 @@ class QuizManager {
         this.tldData = this.prepareTldData();
         this.quizChannels = new Set();
         this.autoTimers = new Map();
+        this.wrongAttempts = new Map(); // Track wrong attempts per channel
+        this.activeQuizzes = new Map(); // Store active quiz data in memory
 
         // Add the TLD quiz channel
         this.quizChannels.add('1419838438349344829');
@@ -54,30 +56,44 @@ class QuizManager {
         return options;
     }
 
-    createQuizEmbed(tld, correctCountry, questionNumber = null) {
-        const options = this.getRandomCountryOptions(correctCountry);
+    createQuizEmbed(tld, correctCountry, showOptions = false, questionNumber = null) {
+        let embed;
 
-        const optionsText = options.map((country, index) => {
-            const letters = ['A', 'B', 'C', 'D', 'E'];
-            return `${letters[index]}) ${country}`;
-        }).join('\n');
+        if (showOptions) {
+            const options = this.getRandomCountryOptions(correctCountry);
 
-        const embed = new EmbedBuilder()
-            .setTitle('🌍 Country TLD Quiz')
-            .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n${optionsText}\n\n*Type the country name or letter (A, B, C, D, E) to answer!*`)
-            .setColor('#3498db')
-            .setFooter({
-                text: 'Quiz System • Type country name or letter to answer',
-                iconURL: 'https://worldguessr.com/favicon.ico'
-            })
-            .setTimestamp();
+            const optionsText = options.map((country, index) => {
+                const letters = ['A', 'B', 'C', 'D', 'E'];
+                return `${letters[index]}) ${country}`;
+            }).join('\n');
+
+            embed = new EmbedBuilder()
+                .setTitle('🌍 Country TLD Quiz')
+                .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n${optionsText}\n\n*Type the country name or letter (A, B, C, D, E) to answer!*`)
+                .setColor('#e67e22') // Orange color for hint mode
+                .setFooter({
+                    text: 'Quiz System • Multiple choice hint mode',
+                    iconURL: 'https://worldguessr.com/favicon.ico'
+                })
+                .setTimestamp();
+
+            // Store the options for later reference
+            embed.quizOptions = options;
+        } else {
+            embed = new EmbedBuilder()
+                .setTitle('🌍 Country TLD Quiz')
+                .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n*Type the country name to answer!*`)
+                .setColor('#3498db')
+                .setFooter({
+                    text: 'Quiz System • Type the country name',
+                    iconURL: 'https://worldguessr.com/favicon.ico'
+                })
+                .setTimestamp();
+        }
 
         if (questionNumber) {
             embed.setTitle(`🌍 Country TLD Quiz #${questionNumber}`);
         }
-
-        // Store the options in the embed for later reference
-        embed.quizOptions = options;
 
         return embed;
     }
@@ -123,10 +139,18 @@ class QuizManager {
             const { tld, country } = this.getRandomTld();
             const options = this.getRandomCountryOptions(country);
 
-            // Store the active quiz in database with options
-            this.db.setActiveQuiz(channel.id, 'tld', tld, country, JSON.stringify(options));
+            // Store the active quiz in memory
+            this.activeQuizzes.set(channel.id, {
+                tld,
+                country,
+                options,
+                showingOptions: false
+            });
 
-            const embed = this.createQuizEmbed(tld, country);
+            // Reset wrong attempts for new question
+            this.wrongAttempts.set(channel.id, 0);
+
+            const embed = this.createQuizEmbed(tld, country, false);
             await channel.send({ embeds: [embed] });
 
             console.log(`📝 Posted TLD quiz: ${tld} -> ${country} in ${channel.name}`);
@@ -148,10 +172,11 @@ class QuizManager {
         // Set new timer for 60 seconds
         const timer = setTimeout(async () => {
             try {
-                const activeQuiz = this.db.getActiveQuiz(channel.id);
+                const activeQuiz = this.activeQuizzes.get(channel.id);
                 if (activeQuiz) {
                     // Clear current quiz and post new one directly
-                    this.db.clearActiveQuiz(channel.id);
+                    this.activeQuizzes.delete(channel.id);
+                    this.wrongAttempts.delete(channel.id);
                     await this.postNewQuestion(channel);
                 }
             } catch (error) {
@@ -233,18 +258,17 @@ class QuizManager {
 
     async handleQuizAnswer(message, activeQuiz) {
         const userAnswer = message.content.trim();
-        const correctCountry = activeQuiz.correct_answer;
-        const tld = activeQuiz.question;
+        const correctCountry = activeQuiz.country;
+        const tld = activeQuiz.tld;
 
-        // Check if answer is a letter (A, B, C, D, E)
+        // Check if answer is a letter (A, B, C, D, E) - only if options are showing
         let isCorrect = false;
         const letterMatch = userAnswer.match(/^[ABCDE]$/i);
 
-        if (letterMatch && activeQuiz.options) {
-            // User typed a letter, check against options
+        if (letterMatch && activeQuiz.showingOptions) {
+            // User typed a letter and options are visible
             const letterIndex = letterMatch[0].toUpperCase().charCodeAt(0) - 65; // A=0, B=1, etc.
-            const options = JSON.parse(activeQuiz.options);
-            const selectedCountry = options[letterIndex];
+            const selectedCountry = activeQuiz.options[letterIndex];
             isCorrect = this.isCorrectAnswer(selectedCountry, correctCountry);
         } else {
             // User typed country name directly
@@ -266,7 +290,8 @@ class QuizManager {
                 console.log(`✅ Correct answer by ${message.author.tag}: ${userAnswer} -> ${correctCountry}`);
 
                 // Clear the current quiz and auto timeout
-                this.db.clearActiveQuiz(message.channel.id);
+                this.activeQuizzes.delete(message.channel.id);
+                this.wrongAttempts.delete(message.channel.id);
                 this.clearAutoTimeout(message.channel.id);
 
                 // Post new question after delay
@@ -277,7 +302,24 @@ class QuizManager {
             } else {
                 await message.react('❌');
                 console.log(`❌ Incorrect answer by ${message.author.tag}: ${userAnswer} -> ${correctCountry}`);
-                // Don't post new question, just react and continue
+
+                // Increment wrong attempts
+                const currentWrong = this.wrongAttempts.get(message.channel.id) || 0;
+                this.wrongAttempts.set(message.channel.id, currentWrong + 1);
+
+                // Show options after 5 wrong attempts
+                if (currentWrong + 1 >= 5 && !activeQuiz.showingOptions) {
+                    activeQuiz.showingOptions = true;
+                    this.activeQuizzes.set(message.channel.id, activeQuiz);
+
+                    const embed = this.createQuizEmbed(tld, correctCountry, true);
+                    await message.channel.send({
+                        content: "💡 **Hint time!** Here are the multiple choice options:",
+                        embeds: [embed]
+                    });
+
+                    console.log(`💡 Showing options for ${tld} after 5 wrong attempts`);
+                }
             }
         } catch (error) {
             console.error('❌ Error reacting to message:', error);
@@ -297,8 +339,6 @@ class QuizManager {
             const channel = await client.channels.fetch(tldChannelId);
 
             if (channel) {
-                // Clear any existing quiz and post fresh question
-                this.db.clearActiveQuiz(tldChannelId);
                 console.log('🔄 Starting fresh TLD quiz...');
                 await this.postNewQuestion(channel);
             }

@@ -41,6 +41,7 @@ class QuizDatabase {
             // Column already exists, ignore
         }
 
+
         // Quiz categories configuration
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS quiz_categories (
@@ -109,6 +110,7 @@ class QuizDatabase {
         const stmt = this.db.prepare('DELETE FROM active_quizzes WHERE channel_id = ?');
         stmt.run(channelId);
     }
+
 
     // Category methods
     getQuizCategory(channelId) {
