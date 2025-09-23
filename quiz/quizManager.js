@@ -1,18 +1,21 @@
 const { EmbedBuilder } = require('discord.js');
 const QuizDatabase = require('../database/database');
 const countryTlds = require('../country_tlds.json');
+const countryFlags = require('../country_flags.json');
 
 class QuizManager {
     constructor() {
         this.db = new QuizDatabase();
         this.tldData = this.prepareTldData();
+        this.flagsData = this.prepareFlagsData();
         this.quizChannels = new Set();
         this.autoTimers = new Map();
         this.wrongAttempts = new Map(); // Track wrong attempts per channel
         this.activeQuizzes = new Map(); // Store active quiz data in memory
 
-        // Add the TLD quiz channel
-        this.quizChannels.add('1419838438349344829');
+        // Add quiz channels
+        this.quizChannels.add('1419838438349344829'); // TLD quiz
+        this.quizChannels.add('1420033591458398258'); // Flags quiz
     }
 
     prepareTldData() {
@@ -28,6 +31,19 @@ class QuizManager {
         return { tldToCountry, countryToTld, allTlds: Object.values(countryTlds) };
     }
 
+    prepareFlagsData() {
+        // Convert the JSON to a format for flag quizzing
+        const flagToCountry = {};
+        const countryToFlag = {};
+
+        for (const [country, flag] of Object.entries(countryFlags)) {
+            flagToCountry[flag] = country;
+            countryToFlag[country.toLowerCase()] = flag;
+        }
+
+        return { flagToCountry, countryToFlag, allFlags: Object.values(countryFlags), allCountries: Object.keys(countryFlags) };
+    }
+
     getRandomTld() {
         const tlds = this.tldData.allTlds;
         const randomTld = tlds[Math.floor(Math.random() * tlds.length)];
@@ -35,8 +51,16 @@ class QuizManager {
         return { tld: randomTld, country };
     }
 
-    getRandomCountryOptions(correctCountry, count = 5) {
-        const allCountries = Object.keys(countryTlds);
+    getRandomFlag() {
+        const countries = this.flagsData.allCountries;
+        const randomCountry = countries[Math.floor(Math.random() * countries.length)];
+        const flag = this.flagsData.countryToFlag[randomCountry.toLowerCase()];
+        return { flag, country: randomCountry };
+    }
+
+    getRandomCountryOptions(correctCountry, count = 5, useFlags = false) {
+        // Use flags data for country options if it's a flags quiz
+        const allCountries = useFlags ? this.flagsData.allCountries : Object.keys(countryTlds);
         const options = [correctCountry];
 
         // Add random wrong answers
@@ -56,52 +80,87 @@ class QuizManager {
         return options;
     }
 
-    createQuizEmbed(tld, correctCountry, showOptions = false, questionNumber = null) {
+    createQuizEmbed(quizType, quizData, correctCountry, showOptions = false, questionNumber = null) {
         let embed;
+        const isFlags = quizType === 'flags';
 
         if (showOptions) {
-            const options = this.getRandomCountryOptions(correctCountry);
+            const options = this.getRandomCountryOptions(correctCountry, 5, isFlags);
 
             const optionsText = options.map((country, index) => {
                 const letters = ['A', 'B', 'C', 'D', 'E'];
                 return `${letters[index]}) ${country}`;
             }).join('\n');
 
-            embed = new EmbedBuilder()
-                .setTitle('🌍 Country TLD Quiz')
-                .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n${optionsText}\n\n*Type the country name or letter (A, B, C, D, E) to answer!*`)
-                .setColor('#e67e22') // Orange color for hint mode
-                .setFooter({
-                    text: 'Quiz System • Multiple choice hint mode',
-                    iconURL: 'https://worldguessr.com/favicon.ico'
-                })
-                .setTimestamp();
+            if (isFlags) {
+                embed = new EmbedBuilder()
+                    .setTitle('🏳️ Country Flag Quiz')
+                    .setDescription(`**Which country has this flag: ${quizData}?**\n\n${optionsText}\n\n*Type the country name or letter (A, B, C, D, E) to answer!*`)
+                    .setColor('#e67e22') // Orange color for hint mode
+                    .setFooter({
+                        text: 'Quiz System • Multiple choice hint mode',
+                        iconURL: 'https://worldguessr.com/favicon.ico'
+                    })
+                    .setTimestamp();
+            } else {
+                embed = new EmbedBuilder()
+                    .setTitle('🌍 Country TLD Quiz')
+                    .setDescription(`**Which country uses the TLD: \`${quizData}\`?**\n\n${optionsText}\n\n*Type the country name or letter (A, B, C, D, E) to answer!*`)
+                    .setColor('#e67e22') // Orange color for hint mode
+                    .setFooter({
+                        text: 'Quiz System • Multiple choice hint mode',
+                        iconURL: 'https://worldguessr.com/favicon.ico'
+                    })
+                    .setTimestamp();
+            }
 
             // Store the options for later reference
             embed.quizOptions = options;
         } else {
-            embed = new EmbedBuilder()
-                .setTitle('🌍 Country TLD Quiz')
-                .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n*Type the country name to answer!*`)
-                .setColor('#3498db')
-                .setFooter({
-                    text: 'Quiz System • Type the country name',
-                    iconURL: 'https://worldguessr.com/favicon.ico'
-                })
-                .setTimestamp();
+            if (isFlags) {
+                embed = new EmbedBuilder()
+                    .setTitle('🏳️ Country Flag Quiz')
+                    .setDescription(`**Which country has this flag: ${quizData}?**\n\n*Type the country name to answer!*`)
+                    .setColor('#3498db')
+                    .setFooter({
+                        text: 'Quiz System • Type the country name',
+                        iconURL: 'https://worldguessr.com/favicon.ico'
+                    })
+                    .setTimestamp();
+            } else {
+                embed = new EmbedBuilder()
+                    .setTitle('🌍 Country TLD Quiz')
+                    .setDescription(`**Which country uses the TLD: \`${quizData}\`?**\n\n*Type the country name to answer!*`)
+                    .setColor('#3498db')
+                    .setFooter({
+                        text: 'Quiz System • Type the country name',
+                        iconURL: 'https://worldguessr.com/favicon.ico'
+                    })
+                    .setTimestamp();
+            }
         }
 
         if (questionNumber) {
-            embed.setTitle(`🌍 Country TLD Quiz #${questionNumber}`);
+            const title = isFlags ? `🏳️ Country Flag Quiz #${questionNumber}` : `🌍 Country TLD Quiz #${questionNumber}`;
+            embed.setTitle(title);
         }
 
         return embed;
     }
 
-    createCorrectAnswerEmbed(tld, country, userName, streak = null) {
+    createCorrectAnswerEmbed(quizType, quizData, country, userName, streak = null) {
+        const isFlags = quizType === 'flags';
+
+        let description;
+        if (isFlags) {
+            description = `**${country}** has the flag ${quizData}\n\n🎉 Well done, ${userName}!`;
+        } else {
+            description = `**${country}** uses \`${quizData}\`\n\n🎉 Well done, ${userName}!`;
+        }
+
         const embed = new EmbedBuilder()
             .setTitle('✅ Correct!')
-            .setDescription(`**${country}** uses \`${tld}\`\n\n🎉 Well done, ${userName}!`)
+            .setDescription(description)
             .setColor('#27ae60')
             .setFooter({
                 text: 'Next question coming up...',
@@ -120,10 +179,19 @@ class QuizManager {
         return embed;
     }
 
-    createIncorrectAnswerEmbed(tld, correctCountry, userAnswer, userName) {
+    createIncorrectAnswerEmbed(quizType, quizData, correctCountry, userAnswer, userName) {
+        const isFlags = quizType === 'flags';
+
+        let description;
+        if (isFlags) {
+            description = `**${correctCountry}** has the flag ${quizData}\n\nYou answered: **${userAnswer}**`;
+        } else {
+            description = `**${correctCountry}** uses \`${quizData}\`\n\nYou answered: **${userAnswer}**`;
+        }
+
         const embed = new EmbedBuilder()
             .setTitle('❌ Incorrect!')
-            .setDescription(`**${correctCountry}** uses \`${tld}\`\n\nYou answered: **${userAnswer}**`)
+            .setDescription(description)
             .setColor('#e74c3c')
             .setFooter({
                 text: 'Better luck next time! Next question coming up...',
@@ -136,12 +204,28 @@ class QuizManager {
 
     async postNewQuestion(channel) {
         try {
-            const { tld, country } = this.getRandomTld();
-            const options = this.getRandomCountryOptions(country);
+            // Determine quiz type based on channel ID
+            const isFlags = channel.id === '1420033591458398258';
+            const quizType = isFlags ? 'flags' : 'tld';
+
+            let quizData, country, options;
+
+            if (isFlags) {
+                const flagQuiz = this.getRandomFlag();
+                quizData = flagQuiz.flag;
+                country = flagQuiz.country;
+                options = this.getRandomCountryOptions(country, 5, true);
+            } else {
+                const tldQuiz = this.getRandomTld();
+                quizData = tldQuiz.tld;
+                country = tldQuiz.country;
+                options = this.getRandomCountryOptions(country, 5, false);
+            }
 
             // Store the active quiz in memory
             this.activeQuizzes.set(channel.id, {
-                tld,
+                quizType,
+                quizData,
                 country,
                 options,
                 showingOptions: false
@@ -150,12 +234,12 @@ class QuizManager {
             // Reset wrong attempts for new question
             this.wrongAttempts.set(channel.id, 0);
 
-            console.log(`🔄 New question posted for ${channel.id}: ${tld} -> ${country}, wrong attempts reset to 0`);
+            console.log(`🔄 New question posted for ${channel.id}: ${quizData} -> ${country}, wrong attempts reset to 0`);
 
-            const embed = this.createQuizEmbed(tld, country, false);
+            const embed = this.createQuizEmbed(quizType, quizData, country, false);
             await channel.send({ embeds: [embed] });
 
-            console.log(`📝 Posted TLD quiz: ${tld} -> ${country} in ${channel.name}`);
+            console.log(`📝 Posted ${quizType} quiz: ${quizData} -> ${country} in ${channel.name}`);
 
             return true;
         } catch (error) {
@@ -229,7 +313,8 @@ class QuizManager {
     async handleQuizAnswer(message, activeQuiz) {
         const userAnswer = message.content.trim();
         const correctCountry = activeQuiz.country;
-        const tld = activeQuiz.tld;
+        const quizType = activeQuiz.quizType;
+        const quizData = activeQuiz.quizData;
 
         // Check if answer is a letter (A, B, C, D, E) - only if options are showing
         let isCorrect = false;
@@ -246,7 +331,7 @@ class QuizManager {
         }
 
         // Update user stats
-        this.db.updateUserStats(message.author.id, 'tld', isCorrect);
+        this.db.updateUserStats(message.author.id, quizType, isCorrect);
 
         // React to the message
         try {
@@ -254,7 +339,7 @@ class QuizManager {
                 await message.react('✅');
 
                 // Send correct answer embed
-                const embed = this.createCorrectAnswerEmbed(tld, correctCountry, message.author.displayName);
+                const embed = this.createCorrectAnswerEmbed(quizType, quizData, correctCountry, message.author.displayName);
                 await message.reply({ embeds: [embed] });
 
                 console.log(`✅ Correct answer by ${message.author.tag}: ${userAnswer} -> ${correctCountry}`);
@@ -282,7 +367,7 @@ class QuizManager {
                 if (currentWrong + 1 >= 5 && !activeQuiz.showingOptions) {
                     activeQuiz.showingOptions = true;
 
-                    const embed = this.createQuizEmbed(tld, correctCountry, true);
+                    const embed = this.createQuizEmbed(quizType, quizData, correctCountry, true);
 
                     // Update the activeQuiz options to match the displayed options
                     activeQuiz.options = embed.quizOptions;
@@ -293,7 +378,7 @@ class QuizManager {
                         embeds: [embed]
                     });
 
-                    console.log(`💡 Showing options for ${tld} after ${currentWrong + 1} wrong attempts`);
+                    console.log(`💡 Showing options for ${quizData} after ${currentWrong + 1} wrong attempts`);
                 }
             }
         } catch (error) {
@@ -309,13 +394,22 @@ class QuizManager {
 
     async initializeQuizChannels(client) {
         try {
-            // Always post a fresh question when bot starts
+            // Start fresh quizzes in both channels when bot starts
             const tldChannelId = '1419838438349344829';
-            const channel = await client.channels.fetch(tldChannelId);
+            const flagsChannelId = '1420033591458398258';
 
-            if (channel) {
+            // Initialize TLD quiz
+            const tldChannel = await client.channels.fetch(tldChannelId);
+            if (tldChannel) {
                 console.log('🔄 Starting fresh TLD quiz...');
-                await this.postNewQuestion(channel);
+                await this.postNewQuestion(tldChannel);
+            }
+
+            // Initialize Flags quiz
+            const flagsChannel = await client.channels.fetch(flagsChannelId);
+            if (flagsChannel) {
+                console.log('🔄 Starting fresh Flags quiz...');
+                await this.postNewQuestion(flagsChannel);
             }
         } catch (error) {
             console.error('❌ Error initializing quiz channels:', error);

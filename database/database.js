@@ -60,6 +60,7 @@ class QuizDatabase {
         `);
 
         insertCategory.run('tld', '1419838438349344829', 'Country TLD (Top Level Domain) Quiz');
+        insertCategory.run('flags', '1420033591458398258', 'Country Flag Quiz');
 
         console.log('✅ Database tables initialized successfully');
     }
