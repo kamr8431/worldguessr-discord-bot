@@ -1,6 +1,6 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
+const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
+const CommandHandler = require('./handlers/commandHandler');
 
 const client = new Client({
     intents: [
@@ -10,20 +10,7 @@ const client = new Client({
     ]
 });
 
-const commands = [
-    new SlashCommandBuilder()
-        .setName('hello')
-        .setDescription('A simple hello world command!')
-        .toJSON(),
-    new SlashCommandBuilder()
-        .setName('check')
-        .setDescription('Check WorldGuessr player statistics')
-        .addStringOption(option =>
-            option.setName('username')
-                .setDescription('WorldGuessr username to check')
-                .setRequired(true))
-        .toJSON()
-];
+const commandHandler = new CommandHandler();
 
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
@@ -36,6 +23,10 @@ client.once('ready', async () => {
 
     console.log(`🟢 Bot status set to: ${client.user.presence.status}`);
 
+    // Load commands
+    commandHandler.loadCommands();
+
+    // Register slash commands
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
@@ -43,7 +34,7 @@ client.once('ready', async () => {
 
         await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
-            { body: commands }
+            { body: commandHandler.getCommandArray() }
         );
 
         console.log('✅ Successfully reloaded application (/) commands.');
@@ -52,150 +43,23 @@ client.once('ready', async () => {
     }
 });
 
+// Handle slash commands
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.commandName === 'hello') {
-        await interaction.reply({
-            content: '👋 Hello World! Welcome to the WorldGuessr Discord Bot!',
-            ephemeral: false
-        });
-    }
-
-    if (interaction.commandName === 'check') {
-        const username = interaction.options.getString('username');
-
-        try {
-            await interaction.deferReply();
-
-            const response = await axios.get(`https://api.worldguessr.com/api/eloRank?username=${encodeURIComponent(username)}`);
-            const data = response.data;
-
-            const embed = new EmbedBuilder()
-                .setTitle(`🌍 WorldGuessr Stats: ${username}`)
-                .setColor(data.league.color)
-                .setThumbnail('https://worldguessr.com/favicon.ico')
-                .addFields(
-                    {
-                        name: '🏆 ELO Rating',
-                        value: `${data.elo}`,
-                        inline: true
-                    },
-                    {
-                        name: '📊 Global ELO Rank',
-                        value: `#${data.rank.toLocaleString()}`,
-                        inline: true
-                    },
-                    {
-                        name: `${data.league.emoji} League`,
-                        value: data.league.name,
-                        inline: true
-                    },
-                    {
-                        name: '⚔️ Duel Statistics',
-                        value: `**Wins:** ${data.duels_wins}\n**Losses:** ${data.duels_losses}\n**Ties:** ${data.duels_tied}`,
-                        inline: true
-                    },
-                    {
-                        name: '📈 Win Rate',
-                        value: `${(data.win_rate * 100).toFixed(1)}%`,
-                        inline: true
-                    }
-                )
-                .setFooter({
-                    text: 'Data from WorldGuessr API',
-                    iconURL: 'https://worldguessr.com/favicon.ico'
-                })
-                .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-
-        } catch (error) {
-            console.error('❌ Error fetching WorldGuessr data:', error);
-
-            if (error.response && error.response.status === 404) {
-                await interaction.editReply({
-                    content: `❌ Player **${username}** not found on WorldGuessr. Check the username spelling!`
-                });
-            } else {
-                await interaction.editReply({
-                    content: '❌ Failed to fetch player data. The WorldGuessr API might be down or the user doesn\'t exist.'
-                });
-            }
-        }
-    }
+    await commandHandler.handleSlashCommand(interaction);
 });
 
+// Handle message commands
 client.on('messageCreate', async (message) => {
-    // Don't log bot messages
+    // Don't respond to bot messages
     if (message.author.bot) return;
 
+    // Log all messages
     console.log(`📝 [${message.guild?.name || 'DM'}] ${message.author.tag}: ${message.content}`);
 
-    // Handle /check commands in regular messages
-    if (message.content.startsWith('/check ')) {
-        const username = message.content.slice(7).trim();
-
-        if (!username) {
-            await message.reply('❌ Please provide a username! Usage: `/check <username>`');
-            return;
-        }
-
-        try {
-            const typing = await message.channel.sendTyping();
-
-            const response = await axios.get(`https://api.worldguessr.com/api/eloRank?username=${encodeURIComponent(username)}`);
-            const data = response.data;
-
-            const embed = new EmbedBuilder()
-                .setTitle(`🌍 WorldGuessr Stats: ${username}`)
-                .setColor(data.league.color)
-                .setThumbnail('https://worldguessr.com/favicon.ico')
-                .addFields(
-                    {
-                        name: '🏆 ELO Rating',
-                        value: `${data.elo}`,
-                        inline: true
-                    },
-                    {
-                        name: '📊 Global ELO Rank',
-                        value: `#${data.rank.toLocaleString()}`,
-                        inline: true
-                    },
-                    {
-                        name: `${data.league.emoji} League`,
-                        value: data.league.name,
-                        inline: true
-                    },
-                    {
-                        name: '⚔️ Duel Statistics',
-                        value: `**Wins:** ${data.duels_wins}\n**Losses:** ${data.duels_losses}\n**Ties:** ${data.duels_tied}`,
-                        inline: true
-                    },
-                    {
-                        name: '📈 Win Rate',
-                        value: `${(data.win_rate * 100).toFixed(1)}%`,
-                        inline: true
-                    }
-                )
-                .setFooter({
-                    text: 'Data from WorldGuessr API',
-                    iconURL: 'https://worldguessr.com/favicon.ico'
-                })
-                .setTimestamp();
-
-            await message.reply({ embeds: [embed] });
-
-        } catch (error) {
-            console.error('❌ Error fetching WorldGuessr data:', error);
-
-            if (error.response && error.response.status === 404) {
-                await message.reply(`❌ Player **${username}** not found on WorldGuessr. Check the username spelling!`);
-            } else {
-                await message.reply('❌ Failed to fetch player data. The WorldGuessr API might be down or the user doesn\'t exist.');
-            }
-        }
-    }
+    // Handle commands (both / and ! prefixes)
+    await commandHandler.handleMessageCommand(message);
 });
 
 client.on('error', (error) => {
@@ -205,5 +69,13 @@ client.on('error', (error) => {
 process.on('unhandledRejection', (error) => {
     console.error('❌ Unhandled promise rejection:', error);
 });
+
+// Hot reload commands in development
+if (process.env.NODE_ENV === 'development') {
+    process.on('SIGUSR2', () => {
+        console.log('🔄 Reloading commands...');
+        commandHandler.reloadCommands();
+    });
+}
 
 client.login(process.env.DISCORD_TOKEN);
