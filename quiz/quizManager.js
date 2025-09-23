@@ -150,25 +150,9 @@ class QuizManager {
             try {
                 const activeQuiz = this.db.getActiveQuiz(channel.id);
                 if (activeQuiz) {
-                    // Post the correct answer and a new question
-                    const embed = new EmbedBuilder()
-                        .setTitle('⏰ Time\'s up!')
-                        .setDescription(`The correct answer was: **${activeQuiz.correct_answer}** uses \`${activeQuiz.question}\``)
-                        .setColor('#f39c12')
-                        .setFooter({
-                            text: 'Next question coming up...',
-                            iconURL: 'https://worldguessr.com/favicon.ico'
-                        })
-                        .setTimestamp();
-
-                    await channel.send({ embeds: [embed] });
-
-                    // Clear current quiz and post new one
+                    // Clear current quiz and post new one directly
                     this.db.clearActiveQuiz(channel.id);
-
-                    setTimeout(async () => {
-                        await this.postNewQuestion(channel);
-                    }, 2000);
+                    await this.postNewQuestion(channel);
                 }
             } catch (error) {
                 console.error('❌ Error handling auto timeout:', error);
