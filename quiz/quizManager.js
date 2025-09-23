@@ -7,6 +7,7 @@ class QuizManager {
         this.db = new QuizDatabase();
         this.tldData = this.prepareTldData();
         this.quizChannels = new Set();
+        this.autoTimers = new Map();
 
         // Add the TLD quiz channel
         this.quizChannels.add('1419838438349344829');
@@ -97,10 +98,59 @@ class QuizManager {
             await channel.send({ embeds: [embed] });
 
             console.log(`📝 Posted TLD quiz: ${tld} -> ${country} in ${channel.name}`);
+
+            // Set up auto-timeout for unanswered questions (60 seconds)
+            this.setAutoTimeout(channel);
+
             return true;
         } catch (error) {
             console.error('❌ Error posting quiz question:', error);
             return false;
+        }
+    }
+
+    setAutoTimeout(channel) {
+        // Clear any existing timer
+        this.clearAutoTimeout(channel.id);
+
+        // Set new timer for 60 seconds
+        const timer = setTimeout(async () => {
+            try {
+                const activeQuiz = this.db.getActiveQuiz(channel.id);
+                if (activeQuiz) {
+                    // Post the correct answer and a new question
+                    const embed = new EmbedBuilder()
+                        .setTitle('⏰ Time\'s up!')
+                        .setDescription(`The correct answer was: **${activeQuiz.correct_answer}** uses \`${activeQuiz.question}\``)
+                        .setColor('#f39c12')
+                        .setFooter({
+                            text: 'Next question coming up...',
+                            iconURL: 'https://worldguessr.com/favicon.ico'
+                        })
+                        .setTimestamp();
+
+                    await channel.send({ embeds: [embed] });
+
+                    // Clear current quiz and post new one
+                    this.db.clearActiveQuiz(channel.id);
+
+                    setTimeout(async () => {
+                        await this.postNewQuestion(channel);
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('❌ Error handling auto timeout:', error);
+            }
+        }, 60000); // 60 seconds
+
+        this.autoTimers.set(channel.id, timer);
+    }
+
+    clearAutoTimeout(channelId) {
+        const timer = this.autoTimers.get(channelId);
+        if (timer) {
+            clearTimeout(timer);
+            this.autoTimers.delete(channelId);
         }
     }
 
@@ -198,8 +248,9 @@ class QuizManager {
             console.error('❌ Error reacting to message:', error);
         }
 
-        // Clear the current quiz and post a new one after a delay
+        // Clear the current quiz and auto timeout
         this.db.clearActiveQuiz(message.channel.id);
+        this.clearAutoTimeout(message.channel.id);
 
         setTimeout(async () => {
             await this.postNewQuestion(message.channel);
@@ -214,16 +265,15 @@ class QuizManager {
 
     async initializeQuizChannels(client) {
         try {
-            // Check if TLD quiz channel needs a question
+            // Always post a fresh question when bot starts
             const tldChannelId = '1419838438349344829';
             const channel = await client.channels.fetch(tldChannelId);
 
             if (channel) {
-                const activeQuiz = this.db.getActiveQuiz(tldChannelId);
-                if (!activeQuiz) {
-                    console.log('🔄 Initializing TLD quiz channel with first question...');
-                    await this.postNewQuestion(channel);
-                }
+                // Clear any existing quiz and post fresh question
+                this.db.clearActiveQuiz(tldChannelId);
+                console.log('🔄 Starting fresh TLD quiz...');
+                await this.postNewQuestion(channel);
             }
         } catch (error) {
             console.error('❌ Error initializing quiz channels:', error);
