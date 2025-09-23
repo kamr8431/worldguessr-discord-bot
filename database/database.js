@@ -144,6 +144,37 @@ class QuizDatabase {
         return stmt.all(limit);
     }
 
+    getUserRank(userId, category) {
+        const stmt = this.db.prepare(`
+            SELECT COUNT(*) + 1 as rank
+            FROM user_stats s1
+            WHERE s1.category = ?
+            AND (s1.correct > (SELECT correct FROM user_stats WHERE user_id = ? AND category = ?)
+                 OR (s1.correct = (SELECT correct FROM user_stats WHERE user_id = ? AND category = ?)
+                     AND s1.total_attempts <= (SELECT total_attempts FROM user_stats WHERE user_id = ? AND category = ?)))
+        `);
+        const result = stmt.get(category, userId, category, userId, category, userId, category);
+        return result ? result.rank : null;
+    }
+
+    getUserOverallRank(userId) {
+        const stmt = this.db.prepare(`
+            WITH ranked_users AS (
+                SELECT user_id,
+                       SUM(correct) as total_correct,
+                       SUM(total_attempts) as total_attempts,
+                       ROW_NUMBER() OVER (ORDER BY SUM(correct) DESC,
+                                         ROUND((SUM(correct) * 100.0 / SUM(total_attempts)), 1) DESC) as rank
+                FROM user_stats
+                WHERE total_attempts > 0
+                GROUP BY user_id
+            )
+            SELECT rank FROM ranked_users WHERE user_id = ?
+        `);
+        const result = stmt.get(userId);
+        return result ? result.rank : null;
+    }
+
     close() {
         this.db.close();
     }
