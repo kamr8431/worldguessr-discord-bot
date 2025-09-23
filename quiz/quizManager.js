@@ -64,10 +64,10 @@ class QuizManager {
 
         const embed = new EmbedBuilder()
             .setTitle('🌍 Country TLD Quiz')
-            .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n${optionsText}\n\n*Type the country name to answer!*`)
+            .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n${optionsText}\n\n*Type the country name or letter (A, B, C, D, E) to answer!*`)
             .setColor('#3498db')
             .setFooter({
-                text: 'Quiz System • Type the country name to answer',
+                text: 'Quiz System • Type country name or letter to answer',
                 iconURL: 'https://worldguessr.com/favicon.ico'
             })
             .setTimestamp();
@@ -75,6 +75,9 @@ class QuizManager {
         if (questionNumber) {
             embed.setTitle(`🌍 Country TLD Quiz #${questionNumber}`);
         }
+
+        // Store the options in the embed for later reference
+        embed.quizOptions = options;
 
         return embed;
     }
@@ -118,9 +121,10 @@ class QuizManager {
     async postNewQuestion(channel) {
         try {
             const { tld, country } = this.getRandomTld();
+            const options = this.getRandomCountryOptions(country);
 
-            // Store the active quiz in database
-            this.db.setActiveQuiz(channel.id, 'tld', tld, country);
+            // Store the active quiz in database with options
+            this.db.setActiveQuiz(channel.id, 'tld', tld, country, JSON.stringify(options));
 
             const embed = this.createQuizEmbed(tld, country);
             await channel.send({ embeds: [embed] });
@@ -244,11 +248,24 @@ class QuizManager {
     }
 
     async handleQuizAnswer(message, activeQuiz) {
-        const userAnswer = message.content;
+        const userAnswer = message.content.trim();
         const correctCountry = activeQuiz.correct_answer;
         const tld = activeQuiz.question;
 
-        const isCorrect = this.isCorrectAnswer(userAnswer, correctCountry);
+        // Check if answer is a letter (A, B, C, D, E)
+        let isCorrect = false;
+        const letterMatch = userAnswer.match(/^[ABCDE]$/i);
+
+        if (letterMatch && activeQuiz.options) {
+            // User typed a letter, check against options
+            const letterIndex = letterMatch[0].toUpperCase().charCodeAt(0) - 65; // A=0, B=1, etc.
+            const options = JSON.parse(activeQuiz.options);
+            const selectedCountry = options[letterIndex];
+            isCorrect = this.isCorrectAnswer(selectedCountry, correctCountry);
+        } else {
+            // User typed country name directly
+            isCorrect = this.isCorrectAnswer(userAnswer, correctCountry);
+        }
 
         // Update user stats
         this.db.updateUserStats(message.author.id, 'tld', isCorrect);

@@ -29,6 +29,7 @@ class QuizDatabase {
                 category TEXT NOT NULL,
                 question TEXT NOT NULL,
                 correct_answer TEXT NOT NULL,
+                options TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -84,12 +85,12 @@ class QuizDatabase {
     }
 
     // Quiz question methods
-    setActiveQuiz(channelId, category, question, correctAnswer) {
+    setActiveQuiz(channelId, category, question, correctAnswer, options = null) {
         const stmt = this.db.prepare(`
-            INSERT OR REPLACE INTO active_quizzes (channel_id, category, question, correct_answer)
-            VALUES (?, ?, ?, ?)
+            INSERT OR REPLACE INTO active_quizzes (channel_id, category, question, correct_answer, options)
+            VALUES (?, ?, ?, ?, ?)
         `);
-        stmt.run(channelId, category, question, correctAnswer);
+        stmt.run(channelId, category, question, correctAnswer, options);
     }
 
     getActiveQuiz(channelId) {
@@ -124,6 +125,23 @@ class QuizDatabase {
             LIMIT ?
         `);
         return stmt.all(category, limit);
+    }
+
+    getOverallLeaderboard(limit = 10) {
+        const stmt = this.db.prepare(`
+            SELECT user_id,
+                   SUM(correct) as total_correct,
+                   SUM(incorrect) as total_incorrect,
+                   SUM(total_attempts) as total_attempts,
+                   ROUND((SUM(correct) * 100.0 / SUM(total_attempts)), 1) as accuracy,
+                   COUNT(DISTINCT category) as categories_played
+            FROM user_stats
+            WHERE total_attempts > 0
+            GROUP BY user_id
+            ORDER BY total_correct DESC, accuracy DESC
+            LIMIT ?
+        `);
+        return stmt.all(limit);
     }
 
     close() {
