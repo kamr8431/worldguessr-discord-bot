@@ -281,9 +281,13 @@ class QuizManager {
                 // Show options after 5 wrong attempts
                 if (currentWrong + 1 >= 5 && !activeQuiz.showingOptions) {
                     activeQuiz.showingOptions = true;
-                    this.activeQuizzes.set(message.channel.id, activeQuiz);
 
                     const embed = this.createQuizEmbed(tld, correctCountry, true);
+
+                    // Update the activeQuiz options to match the displayed options
+                    activeQuiz.options = embed.quizOptions;
+                    this.activeQuizzes.set(message.channel.id, activeQuiz);
+
                     await message.channel.send({
                         content: "💡 **Hint time!** Here are the multiple choice options:",
                         embeds: [embed]
