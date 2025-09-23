@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const CommandHandler = require('./handlers/commandHandler');
+const QuizManager = require('./quiz/quizManager');
 
 const client = new Client({
     intents: [
@@ -11,6 +12,7 @@ const client = new Client({
 });
 
 const commandHandler = new CommandHandler();
+const quizManager = new QuizManager();
 
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
@@ -41,6 +43,9 @@ client.once('ready', async () => {
     } catch (error) {
         console.error('❌ Error registering commands:', error);
     }
+
+    // Initialize quiz system
+    await quizManager.initializeQuizChannels(client);
 });
 
 // Handle slash commands
@@ -57,6 +62,17 @@ client.on('messageCreate', async (message) => {
 
     // Log all messages
     console.log(`📝 [${message.guild?.name || 'DM'}] ${message.author.tag}: ${message.content}`);
+
+    // Check if this is a quiz channel and handle quiz answers
+    if (quizManager.isQuizChannel(message.channel.id)) {
+        const activeQuiz = quizManager.db.getActiveQuiz(message.channel.id);
+
+        if (activeQuiz && !message.content.startsWith('/') && !message.content.startsWith('!')) {
+            // This is a potential quiz answer
+            await quizManager.handleQuizAnswer(message, activeQuiz);
+            return; // Don't process as a command
+        }
+    }
 
     // Handle commands (both / and ! prefixes)
     await commandHandler.handleMessageCommand(message);
