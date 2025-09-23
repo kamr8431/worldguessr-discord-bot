@@ -18,6 +18,11 @@ async function createStatsEmbed(username, data) {
                 inline: true
             },
             {
+                name: '\u200b',
+                value: '\u200b',
+                inline: true
+            },
+            {
                 name: `${data.league.emoji} League`,
                 value: data.league.name,
                 inline: true
@@ -25,6 +30,11 @@ async function createStatsEmbed(username, data) {
             {
                 name: '📈 Win Rate',
                 value: `${(data.win_rate * 100).toFixed(1)}%`,
+                inline: true
+            },
+            {
+                name: '\u200b',
+                value: '\u200b',
                 inline: true
             },
             {
