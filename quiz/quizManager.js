@@ -157,9 +157,6 @@ class QuizManager {
 
             console.log(`📝 Posted TLD quiz: ${tld} -> ${country} in ${channel.name}`);
 
-            // Set up auto-timeout for unanswered questions (60 seconds)
-            this.setAutoTimeout(channel);
-
             return true;
         } catch (error) {
             console.error('❌ Error posting quiz question:', error);
@@ -167,35 +164,6 @@ class QuizManager {
         }
     }
 
-    setAutoTimeout(channel) {
-        // Clear any existing timer
-        this.clearAutoTimeout(channel.id);
-
-        // Set new timer for 60 seconds
-        const timer = setTimeout(async () => {
-            try {
-                const activeQuiz = this.activeQuizzes.get(channel.id);
-                if (activeQuiz) {
-                    // Clear current quiz and post new one directly
-                    this.activeQuizzes.delete(channel.id);
-                    this.wrongAttempts.delete(channel.id);
-                    await this.postNewQuestion(channel);
-                }
-            } catch (error) {
-                console.error('❌ Error handling auto timeout:', error);
-            }
-        }, 60000); // 60 seconds
-
-        this.autoTimers.set(channel.id, timer);
-    }
-
-    clearAutoTimeout(channelId) {
-        const timer = this.autoTimers.get(channelId);
-        if (timer) {
-            clearTimeout(timer);
-            this.autoTimers.delete(channelId);
-        }
-    }
 
     normalizeCountryName(input) {
         return input.toLowerCase()
