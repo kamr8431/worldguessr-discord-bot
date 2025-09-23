@@ -100,11 +100,6 @@ client.on('interactionCreate', async (interaction) => {
                         name: '📈 Win Rate',
                         value: `${(data.win_rate * 100).toFixed(1)}%`,
                         inline: true
-                    },
-                    {
-                        name: '🎯 League Range',
-                        value: `${data.league.min} - ${data.league.max} ELO`,
-                        inline: true
                     }
                 )
                 .setFooter({
@@ -180,11 +175,6 @@ client.on('messageCreate', async (message) => {
                     {
                         name: '📈 Win Rate',
                         value: `${(data.win_rate * 100).toFixed(1)}%`,
-                        inline: true
-                    },
-                    {
-                        name: '🎯 League Range',
-                        value: `${data.league.min} - ${data.league.max} ELO`,
                         inline: true
                     }
                 )
