@@ -29,10 +29,17 @@ class QuizDatabase {
                 category TEXT NOT NULL,
                 question TEXT NOT NULL,
                 correct_answer TEXT NOT NULL,
-                options TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // Add options column if it doesn't exist (migration)
+        try {
+            this.db.exec(`ALTER TABLE active_quizzes ADD COLUMN options TEXT`);
+            console.log('✅ Added options column to active_quizzes table');
+        } catch (error) {
+            // Column already exists, ignore
+        }
 
         // Quiz categories configuration
         this.db.exec(`
