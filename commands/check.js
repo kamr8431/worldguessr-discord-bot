@@ -23,14 +23,14 @@ async function createStatsEmbed(username, data) {
                 inline: true
             },
             {
-                name: '⚔️ Duel Statistics',
-                value: `**Wins:** ${data.duels_wins}\n**Losses:** ${data.duels_losses}\n**Ties:** ${data.duels_tied}`,
-                inline: true
-            },
-            {
                 name: '📈 Win Rate',
                 value: `${(data.win_rate * 100).toFixed(1)}%`,
                 inline: true
+            },
+            {
+                name: '⚔️ Duel Statistics',
+                value: `**Wins:** ${data.duels_wins} | **Losses:** ${data.duels_losses} | **Ties:** ${data.duels_tied}`,
+                inline: false
             }
         )
         .setFooter({
