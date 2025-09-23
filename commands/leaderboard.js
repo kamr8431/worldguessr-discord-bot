@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const QuizDatabase = require('../database/database');
+const { SlashCommandBuilder } = require('discord.js');
+const CommandUtils = require('../utils/commandUtils');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -25,77 +25,18 @@ module.exports = {
         const category = interaction.options.getString('category') || 'overall';
         const limit = interaction.options.getInteger('limit') || 10;
 
-        const db = new QuizDatabase();
-
         try {
-            let leaderboard;
-            let categoryName;
+            const result = await CommandUtils.generateLeaderboardEmbed(interaction.client, category, limit, true);
 
-            if (category === 'overall') {
-                leaderboard = db.getOverallLeaderboard(limit);
-                categoryName = 'Overall Quiz';
-            } else {
-                leaderboard = db.getLeaderboard(category, limit);
-                if (category === 'tld') {
-                    categoryName = 'Country TLD';
-                } else if (category === 'flags') {
-                    categoryName = 'Country Flags';
-                } else {
-                    categoryName = category.toUpperCase();
-                }
-            }
-
-            if (!leaderboard || leaderboard.length === 0) {
+            if (result.error) {
                 await interaction.reply({
-                    content: `❌ No quiz data found yet!`,
+                    content: `❌ ${result.error}`,
                     ephemeral: true
                 });
                 return;
             }
 
-            const embed = new EmbedBuilder()
-                .setTitle(`🏆 ${categoryName} Leaderboard`)
-                .setDescription(`Top ${leaderboard.length} players by correct answers`)
-                .setColor('#f1c40f')
-                .setFooter({
-                    text: 'Quiz Leaderboard • Based on total correct answers',
-                    iconURL: 'https://worldguessr.com/favicon.ico'
-                })
-                .setTimestamp();
-
-            let leaderboardText = '';
-            const medals = ['🥇', '🥈', '🥉'];
-
-            for (let i = 0; i < leaderboard.length; i++) {
-                const user = leaderboard[i];
-                const medal = i < 3 ? medals[i] : `**${i + 1}.**`;
-
-                try {
-                    const discordUser = await interaction.client.users.fetch(user.user_id);
-                    const displayName = discordUser.displayName || discordUser.username;
-
-                    if (category === 'overall') {
-                        leaderboardText += `${medal} **${displayName}**\n`;
-                        leaderboardText += `   ✅ ${user.total_correct} correct • ❌ ${user.total_incorrect} wrong • 📈 ${user.accuracy}% accuracy\n\n`;
-                    } else {
-                        leaderboardText += `${medal} **${displayName}**\n`;
-                        leaderboardText += `   ✅ ${user.correct} correct • ❌ ${user.incorrect} wrong • 📈 ${user.accuracy}% accuracy\n\n`;
-                    }
-                } catch (error) {
-                    // User not found or can't fetch, show ID instead
-                    if (category === 'overall') {
-                        leaderboardText += `${medal} **User ${user.user_id}**\n`;
-                        leaderboardText += `   ✅ ${user.total_correct} correct • ❌ ${user.total_incorrect} wrong • 📈 ${user.accuracy}% accuracy\n\n`;
-                    } else {
-                        leaderboardText += `${medal} **User ${user.user_id}**\n`;
-                        leaderboardText += `   ✅ ${user.correct} correct • ❌ ${user.incorrect} wrong • 📈 ${user.accuracy}% accuracy\n\n`;
-                    }
-                }
-            }
-
-            embed.setDescription(`${embed.data.description}\n\n${leaderboardText.trim()}`);
-
-            await interaction.reply({ embeds: [embed] });
+            await interaction.reply({ embeds: [result.embed] });
 
         } catch (error) {
             console.error('❌ Error fetching leaderboard:', error);
@@ -108,50 +49,14 @@ module.exports = {
 
     async executeMessage(message, args) {
         try {
-            const db = new QuizDatabase();
-            const category = 'tld'; // Default for message command
-            const limit = 10;
+            const result = await CommandUtils.generateLeaderboardEmbed(message.client, 'tld', 10, false);
 
-            const leaderboard = db.getLeaderboard(category, limit);
-
-            if (!leaderboard || leaderboard.length === 0) {
-                await message.reply('❌ No quiz data found yet! Start answering some questions first.');
+            if (result.error) {
+                await message.reply(`❌ ${result.error}`);
                 return;
             }
 
-            const embed = new EmbedBuilder()
-                .setTitle('🏆 Country TLD Quiz Leaderboard')
-                .setDescription(`Top ${leaderboard.length} players by correct answers`)
-                .setColor('#f1c40f')
-                .setFooter({
-                    text: 'Quiz Leaderboard • Use /leaderboard for more options',
-                    iconURL: 'https://worldguessr.com/favicon.ico'
-                })
-                .setTimestamp();
-
-            let leaderboardText = '';
-            const medals = ['🥇', '🥈', '🥉'];
-
-            for (let i = 0; i < Math.min(leaderboard.length, 10); i++) {
-                const user = leaderboard[i];
-                const medal = i < 3 ? medals[i] : `**${i + 1}.**`;
-
-                try {
-                    const discordUser = await message.client.users.fetch(user.user_id);
-                    const displayName = discordUser.displayName || discordUser.username;
-
-                    leaderboardText += `${medal} **${displayName}**\n`;
-                    leaderboardText += `   ✅ ${user.correct} • ❌ ${user.incorrect} • 📈 ${user.accuracy}%\n\n`;
-                } catch (error) {
-                    // User not found, skip or show generic
-                    leaderboardText += `${medal} **Player**\n`;
-                    leaderboardText += `   ✅ ${user.correct} • ❌ ${user.incorrect} • 📈 ${user.accuracy}%\n\n`;
-                }
-            }
-
-            embed.setDescription(`${embed.data.description}\n\n${leaderboardText.trim()}`);
-
-            await message.reply({ embeds: [embed] });
+            await message.reply({ embeds: [result.embed] });
 
         } catch (error) {
             console.error('❌ Error fetching leaderboard:', error);
