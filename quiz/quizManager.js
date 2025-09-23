@@ -33,10 +33,38 @@ class QuizManager {
         return { tld: randomTld, country };
     }
 
-    createQuizEmbed(tld, questionNumber = null) {
+    getRandomCountryOptions(correctCountry, count = 5) {
+        const allCountries = Object.keys(countryTlds);
+        const options = [correctCountry];
+
+        // Add random wrong answers
+        while (options.length < count) {
+            const randomCountry = allCountries[Math.floor(Math.random() * allCountries.length)];
+            if (!options.includes(randomCountry)) {
+                options.push(randomCountry);
+            }
+        }
+
+        // Shuffle the options
+        for (let i = options.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [options[i], options[j]] = [options[j], options[i]];
+        }
+
+        return options;
+    }
+
+    createQuizEmbed(tld, correctCountry, questionNumber = null) {
+        const options = this.getRandomCountryOptions(correctCountry);
+
+        const optionsText = options.map((country, index) => {
+            const letters = ['A', 'B', 'C', 'D', 'E'];
+            return `${letters[index]}) ${country}`;
+        }).join('\n');
+
         const embed = new EmbedBuilder()
             .setTitle('🌍 Country TLD Quiz')
-            .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\nType the country name to answer!`)
+            .setDescription(`**Which country uses the TLD: \`${tld}\`?**\n\n${optionsText}\n\n*Type the country name to answer!*`)
             .setColor('#3498db')
             .setFooter({
                 text: 'Quiz System • Type the country name to answer',
@@ -94,7 +122,7 @@ class QuizManager {
             // Store the active quiz in database
             this.db.setActiveQuiz(channel.id, 'tld', tld, country);
 
-            const embed = this.createQuizEmbed(tld);
+            const embed = this.createQuizEmbed(tld, country);
             await channel.send({ embeds: [embed] });
 
             console.log(`📝 Posted TLD quiz: ${tld} -> ${country} in ${channel.name}`);
@@ -235,26 +263,24 @@ class QuizManager {
                 await message.reply({ embeds: [embed] });
 
                 console.log(`✅ Correct answer by ${message.author.tag}: ${userAnswer} -> ${correctCountry}`);
+
+                // Clear the current quiz and auto timeout
+                this.db.clearActiveQuiz(message.channel.id);
+                this.clearAutoTimeout(message.channel.id);
+
+                // Post new question after delay
+                setTimeout(async () => {
+                    await this.postNewQuestion(message.channel);
+                }, 3000); // 3 second delay before next question
+
             } else {
                 await message.react('❌');
-
-                // Send incorrect answer embed
-                const embed = this.createIncorrectAnswerEmbed(tld, correctCountry, userAnswer, message.author.displayName);
-                await message.reply({ embeds: [embed] });
-
                 console.log(`❌ Incorrect answer by ${message.author.tag}: ${userAnswer} -> ${correctCountry}`);
+                // Don't post new question, just react and continue
             }
         } catch (error) {
             console.error('❌ Error reacting to message:', error);
         }
-
-        // Clear the current quiz and auto timeout
-        this.db.clearActiveQuiz(message.channel.id);
-        this.clearAutoTimeout(message.channel.id);
-
-        setTimeout(async () => {
-            await this.postNewQuestion(message.channel);
-        }, 3000); // 3 second delay before next question
 
         return isCorrect;
     }
