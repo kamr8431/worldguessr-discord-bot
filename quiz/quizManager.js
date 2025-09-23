@@ -259,10 +259,9 @@ class QuizManager {
 
                 console.log(`✅ Correct answer by ${message.author.tag}: ${userAnswer} -> ${correctCountry}`);
 
-                // Clear the current quiz and auto timeout
+                // Clear the current quiz
                 this.activeQuizzes.delete(message.channel.id);
                 this.wrongAttempts.delete(message.channel.id);
-                this.clearAutoTimeout(message.channel.id);
 
                 // Post new question after delay
                 setTimeout(async () => {
