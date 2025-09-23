@@ -150,6 +150,8 @@ class QuizManager {
             // Reset wrong attempts for new question
             this.wrongAttempts.set(channel.id, 0);
 
+            console.log(`🔄 New question posted for ${channel.id}: ${tld} -> ${country}, wrong attempts reset to 0`);
+
             const embed = this.createQuizEmbed(tld, country, false);
             await channel.send({ embeds: [embed] });
 
@@ -307,6 +309,8 @@ class QuizManager {
                 const currentWrong = this.wrongAttempts.get(message.channel.id) || 0;
                 this.wrongAttempts.set(message.channel.id, currentWrong + 1);
 
+                console.log(`📊 Wrong attempts for ${message.channel.id}: ${currentWrong + 1}/5`);
+
                 // Show options after 5 wrong attempts
                 if (currentWrong + 1 >= 5 && !activeQuiz.showingOptions) {
                     activeQuiz.showingOptions = true;
@@ -318,7 +322,7 @@ class QuizManager {
                         embeds: [embed]
                     });
 
-                    console.log(`💡 Showing options for ${tld} after 5 wrong attempts`);
+                    console.log(`💡 Showing options for ${tld} after ${currentWrong + 1} wrong attempts`);
                 }
             }
         } catch (error) {
