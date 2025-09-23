@@ -103,7 +103,7 @@ module.exports = {
 
     async executeMessage(message, args) {
         try {
-            const result = await buildLeaderboardEmbed(message.client, 'tld', 10, false);
+            const result = await buildLeaderboardEmbed(message.client, 'overall', 10, false);
 
             if (result.error) {
                 await message.reply(`❌ ${result.error}`);
