@@ -114,7 +114,7 @@ async function statsLogic({ targetUser, category, isSlash }) {
 
 // Parameter configuration for the command
 const paramConfig = {
-    targetUser: {
+    user: {
         type: 'user',
         default: null, // Will be set to interaction.user or message.author
         messageDefault: null
@@ -131,7 +131,7 @@ module.exports = {
         .setName('stats')
         .setDescription('View your quiz statistics')
         .addUserOption(option =>
-            option.setName('targetUser')
+            option.setName('user')
                 .setDescription('Check another user\'s stats (optional)')
                 .setRequired(false))
         .addStringOption(option =>
@@ -145,7 +145,7 @@ module.exports = {
 
     async execute(interaction) {
         const params = CommandHandler.extractSlashParams(interaction, paramConfig);
-        params.targetUser = params.targetUser || interaction.user;
+        params.targetUser = params.user || interaction.user;
 
         await CommandHandler.handleCommand(statsLogic, params);
     },
