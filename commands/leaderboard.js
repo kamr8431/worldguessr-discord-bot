@@ -11,7 +11,8 @@ module.exports = {
                 .setRequired(false)
                 .addChoices(
                     { name: 'Overall (All Categories)', value: 'overall' },
-                    { name: 'TLD Quiz', value: 'tld' }
+                    { name: 'TLD Quiz', value: 'tld' },
+                    { name: 'Flags Quiz', value: 'flags' }
                 ))
         .addIntegerOption(option =>
             option.setName('limit')
@@ -35,7 +36,13 @@ module.exports = {
                 categoryName = 'Overall Quiz';
             } else {
                 leaderboard = db.getLeaderboard(category, limit);
-                categoryName = category === 'tld' ? 'Country TLD' : category.toUpperCase();
+                if (category === 'tld') {
+                    categoryName = 'Country TLD';
+                } else if (category === 'flags') {
+                    categoryName = 'Country Flags';
+                } else {
+                    categoryName = category.toUpperCase();
+                }
             }
 
             if (!leaderboard || leaderboard.length === 0) {
@@ -69,8 +76,7 @@ module.exports = {
 
                     if (category === 'overall') {
                         leaderboardText += `${medal} **${displayName}**\n`;
-                        leaderboardText += `   ✅ ${user.total_correct} correct • ❌ ${user.total_incorrect} wrong • 📈 ${user.accuracy}% accuracy\n`;
-                        leaderboardText += `   🎯 ${user.categories_played} categories played\n\n`;
+                        leaderboardText += `   ✅ ${user.total_correct} correct • ❌ ${user.total_incorrect} wrong • 📈 ${user.accuracy}% accuracy\n\n`;
                     } else {
                         leaderboardText += `${medal} **${displayName}**\n`;
                         leaderboardText += `   ✅ ${user.correct} correct • ❌ ${user.incorrect} wrong • 📈 ${user.accuracy}% accuracy\n\n`;
