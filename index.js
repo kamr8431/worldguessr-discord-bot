@@ -128,7 +128,7 @@ client.on('threadCreate', async (thread) => {
                             }
                         )
                         .setFooter({
-                            text: data.user_id ? `WorldGuessr API Data • User ID: ${data.user_id}` : 'WorldGuessr API Data',
+                            text: data.id ? `WorldGuessr API Data • User ID: ${data.id}` : 'WorldGuessr API Data',
                             iconURL: 'https://worldguessr.com/favicon.ico'
                         })
                         .setTimestamp();
