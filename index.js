@@ -78,6 +78,80 @@ client.on('messageCreate', async (message) => {
     await commandHandler.handleMessageCommand(message);
 });
 
+// Handle forum thread creation - automatic stats check
+client.on('threadCreate', async (thread) => {
+    // Check if this is the report-user forum channel
+    if (thread.parentId === '1308448612833034240') {
+        try {
+            // Get the username from the thread name
+            const username = thread.name;
+            console.log(`📊 New report thread created for: ${username}`);
+
+            // Try to get WorldGuessr stats using the username from thread title
+            try {
+                const axios = require('axios');
+                const response = await axios.get(`https://api.worldguessr.com/api/eloRank?username=${encodeURIComponent(username)}`);
+
+                if (response.data && !response.data.message) {
+                    const { EmbedBuilder } = require('discord.js');
+                    const data = response.data;
+
+                    const worldGuessrEmbed = new EmbedBuilder()
+                        .setTitle(`🌍 WorldGuessr Stats: ${username}`)
+                        .setColor(data.league.color)
+                        .setThumbnail('https://worldguessr.com/favicon.ico')
+                        .addFields(
+                            {
+                                name: '🏆 ELO Rating',
+                                value: `${data.elo}`,
+                                inline: true
+                            },
+                            {
+                                name: '📊 Global ELO Rank',
+                                value: `#${data.rank.toLocaleString()}`,
+                                inline: true
+                            },
+                            {
+                                name: `${data.league.emoji} League`,
+                                value: data.league.name,
+                                inline: true
+                            },
+                            {
+                                name: '📈 Win Rate',
+                                value: `${(data.win_rate * 100).toFixed(1)}%`,
+                                inline: true
+                            },
+                            {
+                                name: '⚔️ Duel Statistics',
+                                value: `**Wins:** ${data.duels_wins} | **Losses:** ${data.duels_losses} | **Ties:** ${data.duels_tied}`,
+                                inline: false
+                            }
+                        )
+                        .setFooter({
+                            text: 'WorldGuessr API Data',
+                            iconURL: 'https://worldguessr.com/favicon.ico'
+                        })
+                        .setTimestamp();
+
+                    await thread.send({ embeds: [worldGuessrEmbed] });
+                    console.log(`🌍 Posted WorldGuessr stats for ${username} in report thread`);
+                } else {
+                    // No WorldGuessr account found
+                    await thread.send(`📊 **Stats Check for "${username}"**\nNo WorldGuessr account found with this username.`);
+                    console.log(`📊 No WorldGuessr stats found for ${username}`);
+                }
+            } catch (apiError) {
+                await thread.send(`📊 **Stats Check for "${username}"**\nNo WorldGuessr account found or API error occurred.`);
+                console.log(`🌍 No WorldGuessr stats found for ${username} (API error or user doesn't exist)`);
+            }
+
+        } catch (error) {
+            console.error('❌ Error handling thread creation:', error);
+            await thread.send('📊 **Stats Check:** Error retrieving user statistics.').catch(() => {});
+        }
+    }
+});
+
 client.on('error', (error) => {
     console.error('❌ Discord client error:', error);
 });
